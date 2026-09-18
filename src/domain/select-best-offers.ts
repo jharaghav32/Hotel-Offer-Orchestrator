@@ -24,7 +24,13 @@ function toOffer({ supplierId, hotel }: Candidate): HotelOffer {
 }
 
 function compareOffers(a: HotelOffer, b: HotelOffer): number {
-  return a.price - b.price || a.name.localeCompare(b.name);
+  if (a.price !== b.price) {
+    return a.price - b.price;
+  }
+  if (a.name === b.name) {
+    return 0;
+  }
+  return a.name < b.name ? -1 : 1;
 }
 
 export function selectBestOffers(lists: readonly SupplierHotelList[]): HotelOffer[] {

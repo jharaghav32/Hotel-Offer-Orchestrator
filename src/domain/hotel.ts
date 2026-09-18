@@ -19,3 +19,11 @@ export interface SupplierHotelList {
   supplierId: SupplierId;
   hotels: readonly SupplierHotel[];
 }
+
+export type SupplierOutcome = 'ok' | 'failed';
+
+export interface AggregatedHotelOffers {
+  city: string;
+  offers: HotelOffer[];
+  suppliers: Record<SupplierId, SupplierOutcome>;
+}

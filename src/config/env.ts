@@ -9,6 +9,7 @@ const envSchema = z.object({
   TEMPORAL_ADDRESS: z.string().min(1).default('localhost:7233'),
   TEMPORAL_NAMESPACE: z.string().min(1).default('default'),
   TEMPORAL_TASK_QUEUE: z.string().min(1).default('hotel-offers'),
+  TEMPORAL_WORKFLOW_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(30),
   SUPPLIER_BASE_URL: z.url().default('http://localhost:3000'),
   SUPPLIER_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
@@ -19,7 +20,12 @@ export type AppConfig = DeepReadonly<{
   http: { port: number };
   log: { level: string };
   redis: { url: string };
-  temporal: { address: string; namespace: string; taskQueue: string };
+  temporal: {
+    address: string;
+    namespace: string;
+    taskQueue: string;
+    workflowTimeoutSeconds: number;
+  };
   suppliers: { baseUrl: string; timeoutMs: number };
   cache: { ttlSeconds: number };
 }>;
@@ -51,6 +57,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       address: env.TEMPORAL_ADDRESS,
       namespace: env.TEMPORAL_NAMESPACE,
       taskQueue: env.TEMPORAL_TASK_QUEUE,
+      workflowTimeoutSeconds: env.TEMPORAL_WORKFLOW_TIMEOUT_SECONDS,
     },
     suppliers: {
       baseUrl: env.SUPPLIER_BASE_URL.replace(/\/+$/, ''),
