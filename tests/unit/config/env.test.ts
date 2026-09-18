@@ -30,7 +30,11 @@ describe('loadConfig', () => {
     expect(load).toThrow(/REDIS_URL/);
   });
 
-  it('returns an immutable object', () => {
-    expect(Object.isFrozen(loadConfig({}))).toBe(true);
+  it('returns a deeply immutable object', () => {
+    const config = loadConfig({});
+
+    expect(Object.isFrozen(config)).toBe(true);
+    expect(Object.isFrozen(config.http)).toBe(true);
+    expect(Object.isFrozen(config.temporal)).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { deepFreeze, type DeepReadonly } from '../shared/immutable';
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -13,7 +14,7 @@ const envSchema = z.object({
   CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
 });
 
-export type AppConfig = Readonly<{
+export type AppConfig = DeepReadonly<{
   env: 'development' | 'test' | 'production';
   http: { port: number };
   log: { level: string };
@@ -41,7 +42,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
 
   const env = parsed.data;
 
-  return Object.freeze({
+  return deepFreeze({
     env: env.NODE_ENV,
     http: { port: env.PORT },
     log: { level: env.LOG_LEVEL },
