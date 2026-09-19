@@ -392,8 +392,92 @@
     },
     {
       "name": "3. Hotels - valid city with overlaps",
-      "description": "GET /api/hotels?city=delhi: deduplicated list with the cheapest offer per hotel.",
+      "description": "GET /api/hotels?city=delhi: deduplicated list with the cheapest offer per hotel. The folder first clears the Delhi cache and loads both supplier lists as the reference for the checks, so it can run on its own.",
       "item": [
+        {
+          "name": "Evict delhi cache",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/cache/delhi",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "cache", "delhi"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 204', () => pm.response.to.have.status(204));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Supplier A - Delhi offers (reference)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplierA/hotels?city=delhi",
+              "host": ["{{baseUrl}}"],
+              "path": ["supplierA", "hotels"],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "delhi"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('supplierADelhi', JSON.stringify(pm.response.json()));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Supplier B - Delhi offers (reference)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplierB/hotels?city=delhi",
+              "host": ["{{baseUrl}}"],
+              "path": ["supplierB", "hotels"],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "delhi"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('supplierBDelhi', JSON.stringify(pm.response.json()));"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "Delhi - best offer per hotel (cache miss)",
           "request": {

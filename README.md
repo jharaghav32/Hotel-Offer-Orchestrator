@@ -9,10 +9,10 @@ orchestrated by a **Temporal** workflow, results are stored in **Redis**, and pr
 
 - [Setup](#setup)
 - [Deployment](#deployment)
+- [Postman collection](#postman-collection)
 - [Requirements coverage](#requirements-coverage)
 - [Architecture](#architecture)
 - [API reference](#api-reference)
-- [Postman collection](#postman-collection)
 - [Tests](#tests)
 - [Configuration](#configuration)
 - [Design decisions](#design-decisions)
@@ -178,6 +178,66 @@ Droplet or Compute Engine).
   `TEMPORAL_NAMESPACE` at a managed Temporal cluster or Temporal Cloud, and Redis at a managed
   instance through `REDIS_URL`.
 
+## Postman collection
+
+The collection is at `postman/hotel-offer-orchestrator.postman_collection.json`: 47 requests and 171
+automated tests covering every scenario the brief asks for.
+
+| Folder                               | Covers                                                                |
+| ------------------------------------ | --------------------------------------------------------------------- |
+| 0. Setup                             | Re-enables both suppliers and clears cached cities                    |
+| 1. Health                            | `/health`, `/health/live`                                             |
+| 2. Mock suppliers                    | Supplier formats and overlapping hotel names                          |
+| 3. Hotels – valid city with overlaps | `city=delhi`: deduplication, cheapest offer per hotel, cache miss/hit |
+| 4. Hotels – price filter             | Range, min only, max only, inclusive bounds, empty range              |
+| 5. Hotels – city with no results     | `city=paris` → `[]`                                                   |
+| 6. Simulate one supplier down        | Supplier B off: retries, partial result, `degraded` health, recovery  |
+| 7. Simulate all suppliers down       | Both off: `502`, `down` health, recovery                              |
+| 8. Validation and errors             | 400 and 404 responses                                                 |
+
+Start the system first ([Setup](#setup)).
+
+### Run in the Postman app
+
+1. Open Postman (desktop app, or the web app with the Postman Agent so it can reach `localhost`).
+2. Click **Import**, then choose or drag in
+   `postman/hotel-offer-orchestrator.postman_collection.json`. The collection **Hotel Offer
+   Orchestrator** appears in the sidebar.
+3. Check the API address: open the collection, go to the **Variables** tab and make sure `baseUrl` is
+   `http://localhost:3000`. Change it if you started the API on another port or host, then **Save**.
+4. Run everything: open the collection's **⋯** menu, choose **Run collection**, keep the default order
+   and click **Run Hotel Offer Orchestrator**. All 47 requests should pass.
+5. To try a single call, expand a folder, open a request and click **Send**. The response is in the
+   **Body** tab, the headers (`X-Cache`, `X-Unavailable-Suppliers`, `X-Request-Id`) in **Headers**, and
+   the assertions in **Test Results**.
+
+Notes:
+
+- Every folder can also be run on its own (folder **⋯** menu → **Run folder**). If a run was stopped
+  halfway through folder 6 or 7, run **0. Setup** once to switch the suppliers back on.
+- Requests in folders 6 and 7 take about 2 seconds, because the workflow retries the unavailable
+  supplier before giving up.
+
+### Run from the command line
+
+With Node.js (no installation needed):
+
+```bash
+npx newman@6 run postman/hotel-offer-orchestrator.postman_collection.json
+```
+
+With Docker only (works on Linux, macOS and Windows):
+
+```bash
+docker run --rm --add-host=host.docker.internal:host-gateway \
+  -v "$PWD/postman:/etc/newman" postman/newman:6-alpine \
+  run hotel-offer-orchestrator.postman_collection.json \
+  --env-var baseUrl=http://host.docker.internal:3000
+```
+
+Add `--env-var baseUrl=http://<host>:<port>` to target another address, or
+`--folder "6. Simulate one supplier down"` to run a single folder.
+
 ## Requirements coverage
 
 | Requirement                                              | Where                                                                                     |
@@ -317,32 +377,6 @@ These endpoints are not part of the brief; they make failure scenarios reproduci
 curl -X PATCH localhost:3000/admin/suppliers/supplierB -H 'content-type: application/json' -d '{"available":false}'
 curl -X DELETE localhost:3000/admin/cache/mumbai
 curl -i "localhost:3000/api/hotels?city=mumbai"      # Supplier A only, X-Unavailable-Suppliers: supplierB
-```
-
-## Postman collection
-
-`postman/hotel-offer-orchestrator.postman_collection.json` – 44 requests with 165 assertions:
-
-| Folder                               | Covers                                                        |
-| ------------------------------------ | ------------------------------------------------------------- |
-| 0. Setup                             | Re-enables suppliers and evicts cities so runs are repeatable |
-| 1. Health                            | `/health`, `/health/live`                                     |
-| 2. Mock suppliers                    | Supplier formats and overlapping names                        |
-| 3. Hotels – valid city with overlaps | Deduplication, cheapest offer per hotel, cache miss/hit       |
-| 4. Hotels – price filter             | Range, min only, max only, inclusive bounds, empty range      |
-| 5. Hotels – city with no results     | `city=paris` → `[]`                                           |
-| 6. Simulate one supplier down        | Retries, partial result, `degraded` health, recovery          |
-| 7. Simulate all suppliers down       | `502`, `down` health, recovery                                |
-| 8. Validation and errors             | 400 and 404 responses                                         |
-
-**Postman:** Import → select the file → run the collection with the Collection Runner. Change the
-`baseUrl` collection variable if the API is not on `http://localhost:3000`.
-
-**Command line** (with the stack running):
-
-```bash
-docker run --rm --network host -v "$PWD/postman:/etc/newman" postman/newman:6-alpine \
-  run hotel-offer-orchestrator.postman_collection.json --env-var baseUrl=http://localhost:3000
 ```
 
 ## Tests
