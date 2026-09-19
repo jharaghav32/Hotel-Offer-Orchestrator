@@ -5,21 +5,12 @@ offer for every hotel, and serves the result with optional price filtering. The 
 orchestrated by a **Temporal** workflow, results are stored in **Redis**, and price filtering runs
 **inside Redis**. The whole stack starts with Docker Compose.
 
-```
-GET /api/hotels?city=delhi&minPrice=5000&maxPrice=7000
-
-[
-  { "name": "Holtin",  "price": 5340, "supplier": "Supplier B", "commissionPct": 20 },
-  { "name": "Radison", "price": 5900, "supplier": "Supplier A", "commissionPct": 13 }
-]
-```
-
 ## Contents
 
-- [Requirements coverage](#requirements-coverage)
-- [Architecture](#architecture)
 - [Setup](#setup)
 - [Deployment](#deployment)
+- [Requirements coverage](#requirements-coverage)
+- [Architecture](#architecture)
 - [API reference](#api-reference)
 - [Postman collection](#postman-collection)
 - [Tests](#tests)
@@ -27,61 +18,6 @@ GET /api/hotels?city=delhi&minPrice=5000&maxPrice=7000
 - [Design decisions](#design-decisions)
 - [Project structure](#project-structure)
 - [Assumptions and future work](#assumptions-and-future-work)
-
-## Requirements coverage
-
-| Requirement                                              | Where                                                                                     |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Mock `GET /supplierA/hotels` and `GET /supplierB/hotels` | `src/suppliers` – static data with overlapping names in Delhi and Mumbai                  |
-| Call both suppliers in parallel with Temporal            | `src/temporal/workflows/hotel-offers.workflow.ts`                                         |
-| Deduplicate by name, keep the cheaper offer              | `src/domain/select-best-offers.ts` (pure, deterministic, unit tested)                     |
-| `GET /api/hotels?city=`                                  | `src/hotels`                                                                              |
-| Save the deduplicated list in Redis                      | `cacheHotelOffers` activity → `src/cache/hotel-cache.repository.ts`                       |
-| Price filtering inside Redis                             | Lua script running `ZRANGE … BYSCORE` on a sorted set scored by price                     |
-| Docker                                                   | `Dockerfile` (multi-stage, non-root) and `docker-compose.yml` (full stack)                |
-| Postman collection                                       | `postman/hotel-offer-orchestrator.postman_collection.json`                                |
-| Bonus: `/health` with the health of both suppliers       | `src/health` – suppliers, Redis and Temporal, each with status and latency                |
-| Bonus: logging and error handling                        | structured JSON logs (pino) in API, workflow and activities; retry policies; typed errors |
-
-## Architecture
-
-```
-                  ┌───────────────────────── docker compose ─────────────────────────┐
-                  │                                                                  │
- client ─ :3000 ──┼─► api (Express) ────────── Lua: ZRANGE … BYSCORE ──────► redis   │
-                  │    │  /api/hotels  /health                                 ▲     │
-                  │    │  /supplierA   /supplierB ◄──────── HTTP ───────┐      │     │
-                  │    │                                                │      │     │
-                  │    │ start workflow (cache miss)                    │      │     │
-                  │    ▼                                                │      │     │
-                  │  temporal ◄──── task queue "hotel-offers" ────► worker ─────┘     │
-                  │    │                                          fetch A ‖ fetch B  │
-                  │    ▼                                          dedupe, MULTI/EXEC │
-                  │  postgresql                                                      │
- browser ─ :8080 ─┼─► temporal-ui ──► temporal                                       │
-                  └──────────────────────────────────────────────────────────────────┘
-```
-
-**Request flow for `GET /api/hotels`**
-
-1. The query is validated and normalised (`" Delhi "` → `delhi`).
-2. A Lua script checks Redis for the city and, if present, filters by price with
-   `ZRANGE … BYSCORE` and returns the matching offers in one atomic call → `X-Cache: HIT`.
-3. On a miss the API executes the `hotelOffersWorkflow` (workflow id `hotel-offers-{city}`).
-4. The worker runs both `fetchSupplierHotels` activities in parallel, keeps the cheapest offer per
-   hotel name and stores the result in Redis in a single transaction.
-5. The API runs the same Lua script, so filtering always happens in Redis → `X-Cache: MISS`.
-
-**Failure handling**
-
-| Situation                       | Behaviour                                                                                  |
-| ------------------------------- | ------------------------------------------------------------------------------------------ |
-| One supplier fails              | Retried 3× with exponential backoff, then excluded; response has `X-Unavailable-Suppliers` |
-| Both suppliers fail             | Workflow fails with `AllSuppliersUnavailable` → `502`, nothing is cached                   |
-| Supplier returns 4xx / bad data | Not retried (non-retryable failure)                                                        |
-| No worker / Temporal down       | `503 SERVICE_UNAVAILABLE` after `TEMPORAL_WORKFLOW_TIMEOUT_SECONDS`                        |
-| Redis down                      | `503 SERVICE_UNAVAILABLE`; `/health` reports Redis down                                    |
-| Concurrent requests             | Share one running workflow (`USE_EXISTING` conflict policy)                                |
 
 ## Setup
 
@@ -242,6 +178,61 @@ Droplet or Compute Engine).
   `TEMPORAL_NAMESPACE` at a managed Temporal cluster or Temporal Cloud, and Redis at a managed
   instance through `REDIS_URL`.
 
+## Requirements coverage
+
+| Requirement                                              | Where                                                                                     |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Mock `GET /supplierA/hotels` and `GET /supplierB/hotels` | `src/suppliers` – static data with overlapping names in Delhi and Mumbai                  |
+| Call both suppliers in parallel with Temporal            | `src/temporal/workflows/hotel-offers.workflow.ts`                                         |
+| Deduplicate by name, keep the cheaper offer              | `src/domain/select-best-offers.ts` (pure, deterministic, unit tested)                     |
+| `GET /api/hotels?city=`                                  | `src/hotels`                                                                              |
+| Save the deduplicated list in Redis                      | `cacheHotelOffers` activity → `src/cache/hotel-cache.repository.ts`                       |
+| Price filtering inside Redis                             | Lua script running `ZRANGE … BYSCORE` on a sorted set scored by price                     |
+| Docker                                                   | `Dockerfile` (multi-stage, non-root) and `docker-compose.yml` (full stack)                |
+| Postman collection                                       | `postman/hotel-offer-orchestrator.postman_collection.json`                                |
+| Bonus: `/health` with the health of both suppliers       | `src/health` – suppliers, Redis and Temporal, each with status and latency                |
+| Bonus: logging and error handling                        | structured JSON logs (pino) in API, workflow and activities; retry policies; typed errors |
+
+## Architecture
+
+```
+                  ┌───────────────────────── docker compose ─────────────────────────┐
+                  │                                                                  │
+ client ─ :3000 ──┼─► api (Express) ────────── Lua: ZRANGE … BYSCORE ──────► redis   │
+                  │    │  /api/hotels  /health                                 ▲     │
+                  │    │  /supplierA   /supplierB ◄──────── HTTP ───────┐      │     │
+                  │    │                                                │      │     │
+                  │    │ start workflow (cache miss)                    │      │     │
+                  │    ▼                                                │      │     │
+                  │  temporal ◄──── task queue "hotel-offers" ────► worker ─────┘     │
+                  │    │                                          fetch A ‖ fetch B  │
+                  │    ▼                                          dedupe, MULTI/EXEC │
+                  │  postgresql                                                      │
+ browser ─ :8080 ─┼─► temporal-ui ──► temporal                                       │
+                  └──────────────────────────────────────────────────────────────────┘
+```
+
+**Request flow for `GET /api/hotels`**
+
+1. The query is validated and normalised (`" Delhi "` → `delhi`).
+2. A Lua script checks Redis for the city and, if present, filters by price with
+   `ZRANGE … BYSCORE` and returns the matching offers in one atomic call → `X-Cache: HIT`.
+3. On a miss the API executes the `hotelOffersWorkflow` (workflow id `hotel-offers-{city}`).
+4. The worker runs both `fetchSupplierHotels` activities in parallel, keeps the cheapest offer per
+   hotel name and stores the result in Redis in a single transaction.
+5. The API runs the same Lua script, so filtering always happens in Redis → `X-Cache: MISS`.
+
+**Failure handling**
+
+| Situation                       | Behaviour                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------ |
+| One supplier fails              | Retried 3× with exponential backoff, then excluded; response has `X-Unavailable-Suppliers` |
+| Both suppliers fail             | Workflow fails with `AllSuppliersUnavailable` → `502`, nothing is cached                   |
+| Supplier returns 4xx / bad data | Not retried (non-retryable failure)                                                        |
+| No worker / Temporal down       | `503 SERVICE_UNAVAILABLE` after `TEMPORAL_WORKFLOW_TIMEOUT_SECONDS`                        |
+| Redis down                      | `503 SERVICE_UNAVAILABLE`; `/health` reports Redis down                                    |
+| Concurrent requests             | Share one running workflow (`USE_EXISTING` conflict policy)                                |
+
 ## API reference
 
 All errors share one shape:
@@ -262,6 +253,17 @@ the logs.
 | `maxPrice` | no       | non-negative number, inclusive, `≥ minPrice`                               |
 
 **200** – array of `{ name, price, supplier, commissionPct }`, one per hotel, sorted by price.
+
+```bash
+curl "http://localhost:3000/api/hotels?city=delhi&minPrice=5000&maxPrice=7000"
+```
+
+```json
+[
+  { "name": "Holtin", "price": 5340, "supplier": "Supplier B", "commissionPct": 20 },
+  { "name": "Radison", "price": 5900, "supplier": "Supplier A", "commissionPct": 13 }
+]
+```
 
 | Response header           | Meaning                                                  |
 | ------------------------- | -------------------------------------------------------- |
