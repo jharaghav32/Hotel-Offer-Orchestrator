@@ -83,9 +83,6 @@ GET /api/hotels?city=delhi&minPrice=5000&maxPrice=7000
 | Redis down                      | `503 SERVICE_UNAVAILABLE`; `/health` reports Redis down                                    |
 | Concurrent requests             | Share one running workflow (`USE_EXISTING` conflict policy)                                |
 
-A deeper write-up of entities, Redis keys, the Lua script, retry policies and error mapping is in
-[docs/DESIGN.md](docs/DESIGN.md).
-
 ## Quick start with Docker
 
 **Prerequisites:** Docker with Compose v2.
@@ -344,7 +341,6 @@ src/
 └── server.ts      API entry point
 tests/             unit and integration tests, shared fakes in tests/support
 postman/           Postman collection
-docs/DESIGN.md     detailed design
 ```
 
 ## Assumptions and future work
