@@ -1,20 +1,12 @@
 import request from 'supertest';
 import type { Express } from 'express';
-import { createApp } from '../../../src/app';
-import { MockSupplierService } from '../../../src/suppliers/mock-supplier.service';
-import { StaticSupplierCatalog } from '../../../src/suppliers/supplier.catalog';
-import { InMemorySupplierAvailabilityStore } from '../../support/in-memory-supplier-availability.store';
-import { silentLogger } from '../../support/silent-logger';
+import { buildTestApp } from '../../support/test-app';
 
 describe('supplier routes', () => {
   let app: Express;
 
   beforeEach(() => {
-    const supplierService = new MockSupplierService(
-      new StaticSupplierCatalog(),
-      new InMemorySupplierAvailabilityStore(),
-    );
-    app = createApp({ logger: silentLogger, supplierService });
+    ({ app } = buildTestApp());
   });
 
   describe('GET /:supplierId/hotels', () => {

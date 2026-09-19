@@ -21,7 +21,7 @@ async function main(): Promise<void> {
       workflowsPath: require.resolve('./workflows'),
       activities: createHotelOffersActivities({
         supplierClient: new HttpSupplierClient(config.suppliers),
-        hotelCache: new RedisHotelCache(redis, config.cache.ttlSeconds),
+        hotelCache: new RedisHotelCache(redis, config.cache),
       }),
     });
 

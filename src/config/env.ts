@@ -13,6 +13,7 @@ const envSchema = z.object({
   SUPPLIER_BASE_URL: z.url().default('http://localhost:3000'),
   SUPPLIER_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+  PARTIAL_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(30),
 });
 
 export type AppConfig = DeepReadonly<{
@@ -27,7 +28,7 @@ export type AppConfig = DeepReadonly<{
     workflowTimeoutSeconds: number;
   };
   suppliers: { baseUrl: string; timeoutMs: number };
-  cache: { ttlSeconds: number };
+  cache: { ttlSeconds: number; partialTtlSeconds: number };
 }>;
 
 export class ConfigValidationError extends Error {
@@ -63,7 +64,10 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       baseUrl: env.SUPPLIER_BASE_URL.replace(/\/+$/, ''),
       timeoutMs: env.SUPPLIER_TIMEOUT_MS,
     },
-    cache: { ttlSeconds: env.CACHE_TTL_SECONDS },
+    cache: {
+      ttlSeconds: env.CACHE_TTL_SECONDS,
+      partialTtlSeconds: env.PARTIAL_CACHE_TTL_SECONDS,
+    },
   });
 }
 

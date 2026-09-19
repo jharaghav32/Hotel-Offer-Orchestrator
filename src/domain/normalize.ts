@@ -1,5 +1,5 @@
 export function normalizeCity(city: string): string {
-  return city.trim().toLowerCase();
+  return city.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 export function normalizeHotelName(name: string): string {

@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@temporalio/common": "^1.24.0",
     "@temporalio/testing": "^1.24.0",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",

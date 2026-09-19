@@ -1323,7 +1323,7 @@
     nexus-rpc "^0.0.3"
     uuid "^11.1.0"
 
-"@temporalio/common@1.24.0":
+"@temporalio/common@1.24.0", "@temporalio/common@^1.24.0":
   version "1.24.0"
   resolved "https://registry.yarnpkg.com/@temporalio/common/-/common-1.24.0.tgz#786ec99fad1160651338c452772ebaa1c80343ea"
   integrity sha512-jXp77fXwynBcVNc/CaGMT33TVYnhcN26S959HDv7Q71oc0rN6d8RHWR5z0nRCDAu5CQwZQRRhVK0TRdyAiEg7Q==

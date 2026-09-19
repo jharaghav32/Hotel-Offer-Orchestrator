@@ -15,7 +15,7 @@ describeWithRedis('RedisHotelCache', () => {
 
   beforeAll(() => {
     redis = createTestRedis();
-    cache = new RedisHotelCache(redis, 300);
+    cache = new RedisHotelCache(redis, { ttlSeconds: 300, partialTtlSeconds: 30 });
   });
 
   beforeEach(() => redis.flushdb());
@@ -81,6 +81,76 @@ describeWithRedis('RedisHotelCache', () => {
     await expect(redis.hgetall('hotels:paris:meta')).resolves.toMatchObject({
       count: '0',
       supplierB: 'failed',
+    });
+  });
+
+  it('uses the shorter ttl when a supplier failed', async () => {
+    await cache.save({
+      city: 'mumbai',
+      offers,
+      suppliers: { supplierA: 'ok', supplierB: 'failed' },
+      fetchedAt: 'x',
+    });
+
+    for (const key of ['hotels:mumbai:prices', 'hotels:mumbai:offers', 'hotels:mumbai:meta']) {
+      const ttl = await redis.ttl(key);
+      expect(ttl).toBeGreaterThan(0);
+      expect(ttl).toBeLessThanOrEqual(30);
+    }
+  });
+
+  describe('findByPriceRange', () => {
+    const names = (result: { offers: HotelOffer[] } | null) =>
+      result?.offers.map((offer) => offer.name);
+
+    beforeEach(() =>
+      cache.save({
+        city: 'delhi',
+        offers,
+        suppliers: { supplierA: 'ok', supplierB: 'failed' },
+        fetchedAt: '2026-09-19T10:00:00.000Z',
+      }),
+    );
+
+    it('returns null when the city has not been cached', async () => {
+      await expect(cache.findByPriceRange('goa', {})).resolves.toBeNull();
+    });
+
+    it('returns every offer sorted by price with metadata when no range is given', async () => {
+      await expect(cache.findByPriceRange('delhi', {})).resolves.toEqual({
+        city: 'delhi',
+        offers,
+        suppliers: { supplierA: 'ok', supplierB: 'failed' },
+        fetchedAt: '2026-09-19T10:00:00.000Z',
+      });
+    });
+
+    it.each([
+      [{ min: 5000, max: 7000 }, ['Holtin', 'Radison']],
+      [{ min: 5340, max: 5900 }, ['Holtin', 'Radison']],
+      [{ min: 5341, max: 5899 }, []],
+      [{ min: 5900 }, ['Radison', 'Oberoi']],
+      [{ max: 5900 }, ['Holtin', 'Radison']],
+      [{ min: 9000 }, []],
+    ])('filters inside redis for range %j (inclusive bounds)', async (range, expected) => {
+      expect(names(await cache.findByPriceRange('delhi', range))).toEqual(expected);
+    });
+
+    it('returns an empty list for a cached city without hotels', async () => {
+      await cache.save({
+        city: 'paris',
+        offers: [],
+        suppliers: { supplierA: 'ok', supplierB: 'ok' },
+        fetchedAt: 'x',
+      });
+
+      await expect(cache.findByPriceRange('paris', {})).resolves.toMatchObject({ offers: [] });
+    });
+
+    it('treats an expired city as a cache miss', async () => {
+      await redis.del('hotels:delhi:meta');
+
+      await expect(cache.findByPriceRange('delhi', {})).resolves.toBeNull();
     });
   });
 });

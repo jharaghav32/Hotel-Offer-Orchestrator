@@ -3,6 +3,7 @@ export type ErrorCode =
   | 'NOT_FOUND'
   | 'SUPPLIER_UNAVAILABLE'
   | 'ALL_SUPPLIERS_UNAVAILABLE'
+  | 'SERVICE_UNAVAILABLE'
   | 'INTERNAL_ERROR';
 
 export abstract class AppError extends Error {
@@ -37,6 +38,11 @@ export class SupplierUnavailableError extends AppError {
 export class AllSuppliersUnavailableError extends AppError {
   readonly code = 'ALL_SUPPLIERS_UNAVAILABLE';
   readonly statusCode = 502;
+}
+
+export class ServiceUnavailableError extends AppError {
+  readonly code = 'SERVICE_UNAVAILABLE';
+  readonly statusCode = 503;
 }
 
 export class InternalError extends AppError {

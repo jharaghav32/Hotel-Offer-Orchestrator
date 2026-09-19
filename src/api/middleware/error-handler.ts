@@ -24,7 +24,12 @@ function toAppError(error: unknown): AppError {
 export function createErrorHandler(logger: Logger): ErrorRequestHandler {
   return (error: unknown, req, res, _next) => {
     const appError = toAppError(error);
-    const context = { method: req.method, path: req.path, code: appError.code };
+    const context = {
+      requestId: res.locals.requestId,
+      method: req.method,
+      path: req.path,
+      code: appError.code,
+    };
 
     if (appError instanceof InternalError) {
       logger.error({ ...context, err: error }, 'Unhandled error');
