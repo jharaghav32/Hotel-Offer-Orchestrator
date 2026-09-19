@@ -1353,7 +1353,7 @@
     long "^5.3.2"
     nexus-rpc "^0.0.3"
 
-"@temporalio/proto@1.24.0":
+"@temporalio/proto@1.24.0", "@temporalio/proto@^1.24.0":
   version "1.24.0"
   resolved "https://registry.yarnpkg.com/@temporalio/proto/-/proto-1.24.0.tgz#97ccd2e6a7d7ae61aaf8945716c17bf36e79281e"
   integrity sha512-vhlhB9GpoyJx+78r3lDahHywpdri6LKx7kt7djLIw6XzHyb8FQTIi4lX8DSJBqKp3+HVfL1CLwiqO26KFRzg/g==

@@ -22,8 +22,17 @@ export interface TemporalClientOptions {
   namespace: string;
 }
 
-export function createTemporalClient({ address, namespace }: TemporalClientOptions): Client {
-  return new Client({ connection: Connection.lazy({ address }), namespace });
+export interface TemporalHandle {
+  connection: Connection;
+  client: Client;
+}
+
+export function createTemporalClient({
+  address,
+  namespace,
+}: TemporalClientOptions): TemporalHandle {
+  const connection = Connection.lazy({ address });
+  return { connection, client: new Client({ connection, namespace }) };
 }
 
 export interface HotelOffersWorkflowRunner {

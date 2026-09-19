@@ -91,4 +91,18 @@ describe('HttpSupplierClient', () => {
 
     expect(error).toMatchObject({ retryable: true });
   });
+
+  describe('ping', () => {
+    it('resolves when the supplier answers with 2xx', async () => {
+      await expect(clientFor(server.baseUrl).ping('supplierA')).resolves.toBeUndefined();
+      expect(lastUrl).toBe('/supplierA/hotels');
+    });
+
+    it('rejects with the supplier status when it is unavailable', async () => {
+      await expect(clientFor(server.baseUrl).ping('supplierB')).rejects.toMatchObject({
+        message: 'Supplier B responded with HTTP 503',
+        status: 503,
+      });
+    });
+  });
 });

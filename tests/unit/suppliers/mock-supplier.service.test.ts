@@ -1,7 +1,8 @@
-import { SupplierUnavailableError } from '../../../src/shared/errors';
+import { ServiceUnavailableError, SupplierUnavailableError } from '../../../src/shared/errors';
 import { MockSupplierService } from '../../../src/suppliers/mock-supplier.service';
 import { StaticSupplierCatalog } from '../../../src/suppliers/supplier.catalog';
 import { InMemorySupplierAvailabilityStore } from '../../support/in-memory-supplier-availability.store';
+import { silentLogger } from '../../support/silent-logger';
 
 describe('MockSupplierService', () => {
   let service: MockSupplierService;
@@ -10,6 +11,7 @@ describe('MockSupplierService', () => {
     service = new MockSupplierService(
       new StaticSupplierCatalog(),
       new InMemorySupplierAvailabilityStore(),
+      silentLogger,
     );
   });
 
@@ -35,5 +37,26 @@ describe('MockSupplierService', () => {
       { supplierId: 'supplierA', name: 'Supplier A', available: false },
       { supplierId: 'supplierB', name: 'Supplier B', available: true },
     ]);
+  });
+
+  describe('when the availability store is unreachable', () => {
+    const unreachable = new ServiceUnavailableError('Supplier availability store is unavailable');
+    const brokenService = new MockSupplierService(
+      new StaticSupplierCatalog(),
+      {
+        isAvailable: () => Promise.reject(unreachable),
+        setAvailable: () => Promise.reject(unreachable),
+      },
+      silentLogger,
+    );
+
+    it('keeps serving hotels', async () => {
+      await expect(brokenService.listHotels('supplierA', 'delhi')).resolves.not.toHaveLength(0);
+    });
+
+    it('surfaces the outage to availability queries and updates', async () => {
+      await expect(brokenService.listAvailability()).rejects.toBe(unreachable);
+      await expect(brokenService.setAvailability('supplierA', false)).rejects.toBe(unreachable);
+    });
   });
 });

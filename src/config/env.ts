@@ -14,6 +14,8 @@ const envSchema = z.object({
   SUPPLIER_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
   PARTIAL_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(30),
+  HEALTH_CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
 });
 
 export type AppConfig = DeepReadonly<{
@@ -29,6 +31,8 @@ export type AppConfig = DeepReadonly<{
   };
   suppliers: { baseUrl: string; timeoutMs: number };
   cache: { ttlSeconds: number; partialTtlSeconds: number };
+  health: { timeoutMs: number };
+  shutdown: { timeoutMs: number };
 }>;
 
 export class ConfigValidationError extends Error {
@@ -68,6 +72,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       ttlSeconds: env.CACHE_TTL_SECONDS,
       partialTtlSeconds: env.PARTIAL_CACHE_TTL_SECONDS,
     },
+    health: { timeoutMs: env.HEALTH_CHECK_TIMEOUT_MS },
+    shutdown: { timeoutMs: env.SHUTDOWN_TIMEOUT_MS },
   });
 }
 

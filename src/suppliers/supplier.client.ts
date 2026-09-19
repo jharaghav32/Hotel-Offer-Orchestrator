@@ -32,6 +32,10 @@ export interface SupplierClient {
   fetchHotels(supplierId: SupplierId, city: string): Promise<SupplierHotel[]>;
 }
 
+export interface SupplierProbe {
+  ping(supplierId: SupplierId): Promise<void>;
+}
+
 export interface HttpSupplierClientOptions {
   baseUrl: string;
   timeoutMs: number;
@@ -69,7 +73,7 @@ function toRequestError(supplierId: SupplierId, error: unknown): SupplierRequest
   });
 }
 
-export class HttpSupplierClient implements SupplierClient {
+export class HttpSupplierClient implements SupplierClient, SupplierProbe {
   private readonly http: AxiosInstance;
 
   constructor({ baseUrl, timeoutMs }: HttpSupplierClientOptions) {
@@ -100,5 +104,13 @@ export class HttpSupplierClient implements SupplierClient {
       );
     }
     return parsed.data;
+  }
+
+  async ping(supplierId: SupplierId): Promise<void> {
+    try {
+      await this.http.get(`/${supplierId}/hotels`, { responseType: 'text' });
+    } catch (error) {
+      throw toRequestError(supplierId, error);
+    }
   }
 }

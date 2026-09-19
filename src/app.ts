@@ -2,6 +2,9 @@ import express, { type Express } from 'express';
 import { createErrorHandler } from './api/middleware/error-handler';
 import { notFoundHandler } from './api/middleware/not-found';
 import { createRequestLogger } from './api/middleware/request-logger';
+import { HealthController } from './health/health.controller';
+import { createHealthRouter } from './health/health.routes';
+import type { HealthService } from './health/health.service';
 import { HotelController } from './hotels/hotel.controller';
 import { createHotelRouter } from './hotels/hotel.routes';
 import type { HotelService } from './hotels/hotel.service';
@@ -14,9 +17,15 @@ export interface AppDependencies {
   logger: Logger;
   supplierService: MockSupplierService;
   hotelService: HotelService;
+  healthService: HealthService;
 }
 
-export function createApp({ logger, supplierService, hotelService }: AppDependencies): Express {
+export function createApp({
+  logger,
+  supplierService,
+  hotelService,
+  healthService,
+}: AppDependencies): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -28,6 +37,7 @@ export function createApp({ logger, supplierService, hotelService }: AppDependen
   app.use('/', createSupplierRouter(supplierController));
   app.use('/admin', createSupplierAdminRouter(supplierController));
   app.use('/api', createHotelRouter(new HotelController(hotelService)));
+  app.use('/health', createHealthRouter(new HealthController(healthService)));
 
   app.use(notFoundHandler);
   app.use(createErrorHandler(logger));

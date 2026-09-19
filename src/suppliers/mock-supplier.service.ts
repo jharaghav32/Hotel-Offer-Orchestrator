@@ -2,6 +2,7 @@ import type { SupplierAvailabilityStore } from '../cache/supplier-availability.r
 import type { SupplierHotel } from '../domain/hotel';
 import { SUPPLIER_IDS, SUPPLIER_NAMES, type SupplierId } from '../domain/supplier';
 import { SupplierUnavailableError } from '../shared/errors';
+import type { Logger } from '../shared/logger';
 import type { SupplierCatalog } from './supplier.catalog';
 
 export interface SupplierAvailability {
@@ -14,10 +15,11 @@ export class MockSupplierService {
   constructor(
     private readonly catalog: SupplierCatalog,
     private readonly availability: SupplierAvailabilityStore,
+    private readonly logger: Logger,
   ) {}
 
   async listHotels(supplierId: SupplierId, city?: string): Promise<readonly SupplierHotel[]> {
-    if (!(await this.availability.isAvailable(supplierId))) {
+    if (!(await this.isServing(supplierId))) {
       throw new SupplierUnavailableError(`${SUPPLIER_NAMES[supplierId]} is currently unavailable`);
     }
     return this.catalog.listHotels(supplierId, city);
@@ -38,5 +40,17 @@ export class MockSupplierService {
   async setAvailability(supplierId: SupplierId, available: boolean): Promise<SupplierAvailability> {
     await this.availability.setAvailable(supplierId, available);
     return { supplierId, name: SUPPLIER_NAMES[supplierId], available };
+  }
+
+  private async isServing(supplierId: SupplierId): Promise<boolean> {
+    try {
+      return await this.availability.isAvailable(supplierId);
+    } catch (error) {
+      this.logger.warn(
+        { err: error, supplierId },
+        'Supplier availability unknown, serving by default',
+      );
+      return true;
+    }
   }
 }

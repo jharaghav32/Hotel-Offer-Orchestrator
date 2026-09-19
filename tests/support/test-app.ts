@@ -2,6 +2,8 @@ import type { Express } from 'express';
 import { createApp } from '../../src/app';
 import type { SupplierAvailabilityStore } from '../../src/cache/supplier-availability.repository';
 import type { AggregatedHotelOffers } from '../../src/domain/hotel';
+import type { HealthCheck } from '../../src/health/health.checks';
+import { HealthService } from '../../src/health/health.service';
 import { HotelService } from '../../src/hotels/hotel.service';
 import { MockSupplierService } from '../../src/suppliers/mock-supplier.service';
 import { StaticSupplierCatalog } from '../../src/suppliers/supplier.catalog';
@@ -31,6 +33,7 @@ const defaultBehaviour: WorkflowBehaviour = (city) =>
 export interface TestAppOptions {
   availability?: SupplierAvailabilityStore;
   workflow?: WorkflowBehaviour;
+  healthChecks?: HealthCheck[];
 }
 
 export interface TestApp {
@@ -42,14 +45,20 @@ export interface TestApp {
 export function buildTestApp({
   availability = new InMemorySupplierAvailabilityStore(),
   workflow = defaultBehaviour,
+  healthChecks = [],
 }: TestAppOptions = {}): TestApp {
   const hotelCache = new InMemoryHotelCache();
   const workflows = new FakeWorkflowRunner(hotelCache, workflow);
 
   const app = createApp({
     logger: silentLogger,
-    supplierService: new MockSupplierService(new StaticSupplierCatalog(), availability),
+    supplierService: new MockSupplierService(
+      new StaticSupplierCatalog(),
+      availability,
+      silentLogger,
+    ),
     hotelService: new HotelService(hotelCache, workflows, silentLogger),
+    healthService: new HealthService(healthChecks, { timeoutMs: 200 }),
   });
 
   return { app, hotelCache, workflows };
