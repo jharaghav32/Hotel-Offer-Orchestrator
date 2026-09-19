@@ -1,4 +1,4 @@
-import type { HotelCacheReader } from '../cache/hotel-cache.repository';
+import type { HotelCacheEvictor, HotelCacheReader } from '../cache/hotel-cache.repository';
 import type { HotelOffer } from '../domain/hotel';
 import { SUPPLIER_IDS, type SupplierId } from '../domain/supplier';
 import { ServiceUnavailableError } from '../shared/errors';
@@ -16,7 +16,7 @@ export interface HotelSearchResult {
 
 export class HotelService {
   constructor(
-    private readonly cache: HotelCacheReader,
+    private readonly cache: HotelCacheReader & HotelCacheEvictor,
     private readonly workflows: HotelOffersWorkflowRunner,
     private readonly logger: Logger,
   ) {}
@@ -38,6 +38,12 @@ export class HotelService {
       throw new ServiceUnavailableError('Hotel offers are not available in the cache');
     }
     return this.toResult(fresh, 'MISS');
+  }
+
+  async evict(city: string): Promise<boolean> {
+    const evicted = await this.cache.evict(city);
+    this.logger.info({ city, evicted }, 'Hotel offers cache evicted');
+    return evicted;
   }
 
   private toResult(

@@ -6,7 +6,7 @@ import { HealthController } from './health/health.controller';
 import { createHealthRouter } from './health/health.routes';
 import type { HealthService } from './health/health.service';
 import { HotelController } from './hotels/hotel.controller';
-import { createHotelRouter } from './hotels/hotel.routes';
+import { createHotelAdminRouter, createHotelRouter } from './hotels/hotel.routes';
 import type { HotelService } from './hotels/hotel.service';
 import type { Logger } from './shared/logger';
 import type { MockSupplierService } from './suppliers/mock-supplier.service';
@@ -36,7 +36,9 @@ export function createApp({
   const supplierController = new SupplierController(supplierService);
   app.use('/', createSupplierRouter(supplierController));
   app.use('/admin', createSupplierAdminRouter(supplierController));
-  app.use('/api', createHotelRouter(new HotelController(hotelService)));
+  const hotelController = new HotelController(hotelService);
+  app.use('/api', createHotelRouter(hotelController));
+  app.use('/admin', createHotelAdminRouter(hotelController));
   app.use('/health', createHealthRouter(new HealthController(healthService)));
 
   app.use(notFoundHandler);

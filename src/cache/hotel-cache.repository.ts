@@ -21,6 +21,10 @@ export interface HotelCacheReader {
   findByPriceRange(city: string, range: PriceRange): Promise<CachedHotelOffers | null>;
 }
 
+export interface HotelCacheEvictor {
+  evict(city: string): Promise<boolean>;
+}
+
 export interface HotelCacheTtl {
   ttlSeconds: number;
   partialTtlSeconds: number;
@@ -62,7 +66,7 @@ function toOutcomes(meta: Record<string, string>): Record<SupplierId, SupplierOu
   ) as Record<SupplierId, SupplierOutcome>;
 }
 
-export class RedisHotelCache implements HotelCacheWriter, HotelCacheReader {
+export class RedisHotelCache implements HotelCacheWriter, HotelCacheReader, HotelCacheEvictor {
   constructor(
     private readonly redis: Redis,
     private readonly ttl: HotelCacheTtl,
@@ -137,5 +141,18 @@ export class RedisHotelCache implements HotelCacheWriter, HotelCacheReader {
       suppliers: toOutcomes(meta),
       fetchedAt: meta.fetchedAt ?? '',
     };
+  }
+
+  async evict(city: string): Promise<boolean> {
+    try {
+      const removed = await this.redis.del(
+        redisKeys.hotelMeta(city),
+        redisKeys.hotelPrices(city),
+        redisKeys.hotelOffers(city),
+      );
+      return removed > 0;
+    } catch (error) {
+      throw new ServiceUnavailableError('Hotel cache is unavailable', undefined, { cause: error });
+    }
   }
 }

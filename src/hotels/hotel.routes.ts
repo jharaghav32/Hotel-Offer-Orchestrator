@@ -8,3 +8,11 @@ export function createHotelRouter(controller: HotelController): Router {
 
   return router;
 }
+
+export function createHotelAdminRouter(controller: HotelController): Router {
+  const router = Router();
+
+  router.delete('/cache/:city', controller.evictCache);
+
+  return router;
+}

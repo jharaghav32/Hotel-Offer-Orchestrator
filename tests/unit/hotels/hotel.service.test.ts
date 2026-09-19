@@ -60,4 +60,15 @@ describe('HotelService', () => {
 
     await expect(service.search({ city: 'goa' })).rejects.toBe(failure);
   });
+
+  it('evicts a city so the next search runs the workflow again', async () => {
+    await service.search({ city: 'delhi' });
+
+    await expect(service.evict('delhi')).resolves.toBe(true);
+    await expect(service.evict('delhi')).resolves.toBe(false);
+    const result = await service.search({ city: 'delhi' });
+
+    expect(result.cache).toBe('MISS');
+    expect(workflows.runs).toEqual(['delhi', 'delhi']);
+  });
 });

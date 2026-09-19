@@ -153,4 +153,19 @@ describeWithRedis('RedisHotelCache', () => {
       await expect(cache.findByPriceRange('delhi', {})).resolves.toBeNull();
     });
   });
+
+  it('evicts every key of a city and reports whether anything was removed', async () => {
+    await cache.save({
+      city: 'delhi',
+      offers,
+      suppliers: { supplierA: 'ok', supplierB: 'ok' },
+      fetchedAt: 'x',
+    });
+
+    await expect(cache.evict('delhi')).resolves.toBe(true);
+    await expect(
+      redis.exists('hotels:delhi:meta', 'hotels:delhi:prices', 'hotels:delhi:offers'),
+    ).resolves.toBe(0);
+    await expect(cache.evict('delhi')).resolves.toBe(false);
+  });
 });

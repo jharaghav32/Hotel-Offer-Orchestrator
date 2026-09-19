@@ -1,11 +1,12 @@
 import type {
   CachedHotelOffers,
+  HotelCacheEvictor,
   HotelCacheReader,
   HotelCacheWriter,
   PriceRange,
 } from '../../src/cache/hotel-cache.repository';
 
-export class InMemoryHotelCache implements HotelCacheReader, HotelCacheWriter {
+export class InMemoryHotelCache implements HotelCacheReader, HotelCacheWriter, HotelCacheEvictor {
   private readonly entries = new Map<string, CachedHotelOffers>();
   readonly queries: { city: string; range: PriceRange }[] = [];
 
@@ -26,5 +27,9 @@ export class InMemoryHotelCache implements HotelCacheReader, HotelCacheWriter {
       ...entry,
       offers: entry.offers.filter((offer) => offer.price >= min && offer.price <= max),
     });
+  }
+
+  evict(city: string): Promise<boolean> {
+    return Promise.resolve(this.entries.delete(city));
   }
 }

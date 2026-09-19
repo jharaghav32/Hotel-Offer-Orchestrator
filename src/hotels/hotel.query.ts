@@ -10,7 +10,7 @@ const requiredString = (field: string) =>
       issue.input === undefined ? `${field} is required` : `${field} must be a single value`,
   });
 
-const city = requiredString('city')
+export const citySchema = requiredString('city')
   .transform(normalizeCity)
   .pipe(
     z
@@ -29,7 +29,7 @@ const price = (field: string) =>
 
 export const hotelSearchQuerySchema = z
   .object({
-    city,
+    city: citySchema,
     minPrice: price('minPrice'),
     maxPrice: price('maxPrice'),
   })
@@ -40,3 +40,5 @@ export const hotelSearchQuerySchema = z
   );
 
 export type HotelSearchQuery = z.output<typeof hotelSearchQuerySchema>;
+
+export const cityParamsSchema = z.object({ city: citySchema });

@@ -118,4 +118,35 @@ describe('GET /api/hotels', () => {
     expect(echoed.headers['x-request-id']).toBe('trace-123');
     expect(generated.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
   });
+
+  describe('DELETE /admin/cache/:city', () => {
+    it('evicts the city so the next search is a cache miss', async () => {
+      const { app, workflows } = buildTestApp();
+      await request(app).get('/api/hotels').query({ city: 'delhi' });
+
+      const evicted = await request(app).delete('/admin/cache/Delhi');
+      const next = await request(app).get('/api/hotels').query({ city: 'delhi' });
+
+      expect(evicted.status).toBe(204);
+      expect(next.headers['x-cache']).toBe('MISS');
+      expect(workflows.runs).toEqual(['delhi', 'delhi']);
+    });
+
+    it('is idempotent for cities that are not cached', async () => {
+      const { app } = buildTestApp();
+
+      const response = await request(app).delete('/admin/cache/goa');
+
+      expect(response.status).toBe(204);
+    });
+
+    it('rejects an invalid city', async () => {
+      const { app } = buildTestApp();
+
+      const response = await request(app).delete('/admin/cache/de$lhi');
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
 });

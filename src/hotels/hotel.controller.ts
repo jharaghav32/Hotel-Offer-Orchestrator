@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { parseInput } from '../api/validation';
-import { hotelSearchQuerySchema } from './hotel.query';
+import { cityParamsSchema, hotelSearchQuerySchema } from './hotel.query';
 import type { HotelService } from './hotel.service';
 
 export class HotelController {
@@ -15,5 +15,11 @@ export class HotelController {
       res.set('X-Unavailable-Suppliers', result.unavailableSuppliers.join(','));
     }
     res.json(result.offers);
+  };
+
+  evictCache = async (req: Request, res: Response) => {
+    const { city } = parseInput(cityParamsSchema, req.params);
+    await this.service.evict(city);
+    res.status(204).end();
   };
 }
