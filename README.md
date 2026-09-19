@@ -18,8 +18,8 @@ GET /api/hotels?city=delhi&minPrice=5000&maxPrice=7000
 
 - [Requirements coverage](#requirements-coverage)
 - [Architecture](#architecture)
-- [Quick start with Docker](#quick-start-with-docker)
-- [Local development](#local-development)
+- [Setup](#setup)
+- [Deployment](#deployment)
 - [API reference](#api-reference)
 - [Postman collection](#postman-collection)
 - [Tests](#tests)
@@ -83,43 +83,49 @@ GET /api/hotels?city=delhi&minPrice=5000&maxPrice=7000
 | Redis down                      | `503 SERVICE_UNAVAILABLE`; `/health` reports Redis down                                    |
 | Concurrent requests             | Share one running workflow (`USE_EXISTING` conflict policy)                                |
 
-## Quick start with Docker
+## Setup
 
-**Prerequisites:** Docker with Compose v2.
+### Prerequisites
 
-```bash
-git clone <repository-url> hotel-offer-orchestrator
-cd hotel-offer-orchestrator
-docker compose up -d --build --wait
-```
+| Tool                              | Needed for                        |
+| --------------------------------- | --------------------------------- |
+| Docker Engine 24+ with Compose v2 | running the system (all you need) |
+| Node.js 22.12+ and Yarn 1         | local development and tests only  |
 
-The first start takes about 1–2 minutes (image build and Temporal schema setup). When the command
-returns, every service is healthy.
+### Run with Docker (recommended)
+
+1. Get the code:
+
+   ```bash
+   git clone <repository-url> hotel-offer-orchestrator
+   cd hotel-offer-orchestrator
+   ```
+
+2. Build and start every service:
+
+   ```bash
+   docker compose up -d --build --wait
+   ```
+
+   The first start takes about 1–2 minutes (image build and Temporal schema setup). The command
+   returns once every service is healthy. If ports 3000 or 8080 are taken, prefix it with
+   `API_PORT=3001 TEMPORAL_UI_PORT=8081`.
+
+3. Check that it works:
+
+   ```bash
+   curl -s  "http://localhost:3000/health"
+   curl -i "http://localhost:3000/api/hotels?city=delhi"
+   curl -i "http://localhost:3000/api/hotels?city=delhi&minPrice=5000&maxPrice=7000"
+   ```
+
+4. Optionally run the whole Postman collection (see [Postman collection](#postman-collection)).
 
 | URL                                         | What                                 |
 | ------------------------------------------- | ------------------------------------ |
 | http://localhost:3000/api/hotels?city=delhi | Aggregated hotel offers              |
 | http://localhost:3000/health                | Health of suppliers, Redis, Temporal |
 | http://localhost:8080                       | Temporal Web UI (workflow history)   |
-
-```bash
-curl -i "http://localhost:3000/api/hotels?city=delhi"
-curl -i "http://localhost:3000/api/hotels?city=delhi&minPrice=5000&maxPrice=7000"
-curl -s  "http://localhost:3000/health"
-```
-
-Useful commands:
-
-```bash
-docker compose logs -f api worker          # structured JSON logs
-docker compose up -d --scale worker=3      # scale workers horizontally
-docker compose down                        # stop (keeps Temporal history)
-docker compose down -v                     # stop and delete all data
-```
-
-If ports 3000 or 8080 are taken, override them: `API_PORT=3001 TEMPORAL_UI_PORT=8081 docker compose up -d --wait`.
-
-### Services
 
 | Service       | Image                          | Role                                                |
 | ------------- | ------------------------------ | --------------------------------------------------- |
@@ -130,9 +136,11 @@ If ports 3000 or 8080 are taken, override them: `API_PORT=3001 TEMPORAL_UI_PORT=
 | `temporal-ui` | `temporalio/ui:2.42.1`         | Web UI                                              |
 | `redis`       | `redis:8-alpine`               | Cache of deduplicated offers                        |
 
-## Local development
+Stop with `docker compose down` (keeps Temporal history) or `docker compose down -v` (deletes all data).
 
-**Prerequisites:** Node.js 22.12+ (the repo pins 26 in `.nvmrc`), Yarn 1, Docker.
+### Local development
+
+Runs the API and worker from source with hot reload, against Temporal and Redis in containers.
 
 ```bash
 nvm use
@@ -161,6 +169,78 @@ The Temporal dev server includes its UI at http://localhost:8233.
 | `yarn typecheck`        | TypeScript check                           |
 | `yarn lint`             | ESLint                                     |
 | `yarn format`           | Prettier                                   |
+
+## Deployment
+
+The same Compose file deploys the system to any Linux host with Docker (a cloud VM such as EC2,
+Droplet or Compute Engine).
+
+1. **Prepare the host** – install Docker Engine with the Compose plugin and allow inbound traffic on
+   the API port (3000 by default).
+
+2. **Get the code** on the host:
+
+   ```bash
+   git clone <repository-url> hotel-offer-orchestrator
+   cd hotel-offer-orchestrator
+   ```
+
+3. **Configure** – create a `.env` file next to `docker-compose.yml`. Compose reads it automatically;
+   every value is optional:
+
+   ```bash
+   API_PORT=3000
+   TEMPORAL_UI_PORT=8080
+   TEMPORAL_DB_PASSWORD=change-me
+   LOG_LEVEL=info
+   CACHE_TTL_SECONDS=300
+   PARTIAL_CACHE_TTL_SECONDS=30
+   ```
+
+   Set `TEMPORAL_DB_PASSWORD` before the first start; it initialises the PostgreSQL volume.
+
+4. **Start**:
+
+   ```bash
+   docker compose up -d --build --wait
+   ```
+
+5. **Verify** – `curl http://<host>:3000/health` returns `"status":"ok"`. For an end-to-end check,
+   run the Postman collection with `baseUrl=http://<host>:3000`.
+
+6. **Update to a new version**:
+
+   ```bash
+   git pull
+   docker compose up -d --build --wait
+   ```
+
+   Only the `api` and `worker` containers are recreated. Both shut down gracefully (in-flight
+   requests and activities finish first), and Temporal history is kept in the `temporal-postgres`
+   volume.
+
+7. **Operate**:
+
+   ```bash
+   docker compose ps                          # status and health of every service
+   docker compose logs -f api worker          # structured JSON logs
+   docker compose up -d --scale worker=3      # scale workers horizontally
+   docker compose restart api                 # restart one service
+   ```
+
+### Production checklist
+
+- Put the API behind a reverse proxy or load balancer with TLS. Use `GET /health/live` as the
+  liveness probe and `GET /health` as the readiness probe.
+- Do not expose the Temporal UI publicly: remove its `ports` mapping or restrict it with a firewall.
+- The `/admin/*` endpoints are unauthenticated testing tools; block them at the proxy.
+- The `api` and `worker` services are stateless, use the same image and are configured only through
+  environment variables (see [Configuration](#configuration)), so they can move to Kubernetes or ECS
+  unchanged. Build and publish the image with
+  `docker build -t <registry>/hotel-offer-orchestrator:<version> .` and `docker push`.
+- `temporalio/auto-setup` targets single-host setups. For production, point `TEMPORAL_ADDRESS` and
+  `TEMPORAL_NAMESPACE` at a managed Temporal cluster or Temporal Cloud, and Redis at a managed
+  instance through `REDIS_URL`.
 
 ## API reference
 
